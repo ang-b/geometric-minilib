@@ -21,13 +21,14 @@ classdef LtiProperSystem < handle
         n1
         p1
         G
+        transformedSystem
     end
     
     methods (Access = public)
         function self = LtiProperSystem(A,B,C,E)
             %LTIPROPERSYSTEM Construct an instance of this class
             %   Detailed explanation goes here
-            [n,m,p,q,err] = LtiProperSystem.validateConstruction(A,B,C);
+            [n,m,p,q,err] = LtiProperSystem.validateConstruction(A,B,C,E);
             if ~isempty(err), error(err); end
             self.A = A;
             self.B = B;
@@ -46,19 +47,19 @@ classdef LtiProperSystem < handle
             self.algebraicProperties.leftInvertible = true;
         end
         
-        function W = computeInfACinvariantSuspaceContainingB(self)
+        function W = getInfACinvariantSuspaceContainingB(self)
             W = zeros(self.n);
             for i = 1:self.n
-                P = null(W');
+                P = null(W')';
                 Tw = null([P; self.C]);
                 W = [self.B, self.A*Tw];
             end
         end
 
-        function S = computeInfUnobservabilitySubspaceContainingB(self)
+        function S = getInfUnobservabilitySubspaceContainingB(self)
             if isempty(self.infUnobserabilitySubspace)
                 S = eye(self.n);
-                W = self.computeInfACinvariantSuspaceContainingB();
+                W = self.getInfACinvariantSuspaceContainingB();
                 for i = 1:self.n
                     P = null(S')';
                     Ts = null([P*self.A; self.C]);
@@ -70,15 +71,15 @@ classdef LtiProperSystem < handle
             end
         end
 
-        function [T, Gamma, n1, p1] = computeUnobSubspaceTransform(self)
+        function [T, Gamma, n1, p1] = getUnobSubspaceTransform(self)
             if isempty(self.infUnobserabilitySubspace)
-                self.computeInfUnobservabilitySubspaceContainingB();
+                self.getInfUnobservabilitySubspaceContainingB();
             end
 
             if isempty(self.T)
                 T2 = self.infUnobserabilitySubspace;
                 T1 = null(T2');
-                self.n1 = self.n - size(T1, 1);
+                self.n1 = self.n - size(T2, 2);
                 self.T = [T1, T2];
                 G2 = orth(self.C*T2);
                 self.p1 = self.p - size(G2, 2);
@@ -93,7 +94,7 @@ classdef LtiProperSystem < handle
 
         function G = designGainLQR(self, Q,R)
             if isempty(self.T)
-                self.computeUnobSubspaceTransform();
+                self.getUnobSubspaceTransform();
             end
             
             S = self.infUnobserabilitySubspace;
@@ -106,7 +107,7 @@ classdef LtiProperSystem < handle
             Aa = P * Ag / P;
             
             Sc = orth([S self.outputKernel]);
-            H = (self.C' \ null(Sc'));
+            H = (self.C' \ null(Sc'))';
             Ca = H * self.C / P;
 
             Db = dlqr(Aa.', -Ca.', Q, R).';
@@ -130,6 +131,33 @@ classdef LtiProperSystem < handle
             n1 = self.n1;
             p1 = self.p1;
         end
+
+        function sys = getBlockUnobSubspaceDecomposition(self)
+            [AT,BT,CT,ET,~,~] = self.getUnobSubspaceDecomposition();
+
+            ABlock = BlockMatrix(2,2);
+            ABlock.setBlock(1, 1, AT(1:self.n1, 1:self.n1));
+            ABlock.setBlock(2, 1, AT(self.n1+1:self.n, 1:self.n1));
+            ABlock.setBlock(2, 2, AT(self.n1+1:self.n, self.n1+1:self.n));
+            self.transformedSystem.A = ABlock;
+            
+            BBlock = BlockMatrix(2,1);
+            BBlock.setBlock(2,1, BT(self.n1+1:self.n, :));
+            self.transformedSystem.B = BBlock;
+
+            CBlock = BlockMatrix(2,2);
+            CBlock.setBlock(1, 1, CT(1:self.p1, 1:self.n1));
+            CBlock.setBlock(2, 1, CT(self.p1+1:self.p, 1:self.n1));
+            CBlock.setBlock(2, 2, CT(self.p1+1:self.p, self.n1+1:self.n));
+            self.transformedSystem.C = CBlock;
+
+            EBlock = BlockMatrix(2,1);
+            EBlock.setBlock(1, 1, ET(1:self.n1, :));
+            EBlock.setBlock(2, 1, ET(self.n1+1:self.n, :));
+            self.transformedSystem.E = EBlock;
+
+            sys = self.transformedSystem;
+        end
     end
 
     methods (Static, Access = private)
@@ -141,7 +169,7 @@ classdef LtiProperSystem < handle
             if nb ~= n, err = "B must have the same number of rows as A"; end
             [ne, q] = size(E);
             if ne ~= n, err = "E must have the same number of rows as A"; end
-            [p, nc] = size(C, 2);
+            [p, nc] = size(C);
             if nc ~= n, err = "C must have the same number of columns as A"; end
             if rank(C) ~= p, err = "Please use full row-rank C"; end
             if rank(B) ~= m, err = "Please use full column-rank B"; end
