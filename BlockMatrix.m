@@ -3,10 +3,6 @@ classdef BlockMatrix < handle
     %   Detailed explanation goes here
     
     properties (GetAccess = public, SetAccess = private)
-        rowBlocks
-        columnBlocks
-%         rows
-%         columns
         rowSizes
         columnSizes
     end
@@ -17,8 +13,6 @@ classdef BlockMatrix < handle
     
     methods
         function self = BlockMatrix(varargin)        
-            self.rowBlocks = 0;
-            self.columnBlocks = 0;
             self.rowSizes = 0;
             self.columnSizes = 0;
             switch (nargin)
@@ -43,29 +37,16 @@ classdef BlockMatrix < handle
             blkRows = size(block, 1);
             blkCols = size(block, 2);
             if i <= size(self.data, 1) && j <= size(self.data, 2)
-                 if isempty(self.data{i,j})
-                     if self.rowSizes(i) == 0 && self.columnSizes(j) == 0
-                        self.data{i,j} = block;
-                        self.rowSizes(i) = blkRows;
-                        self.columnSizes(j) = blkCols;
-                     else
-                         if (self.rowSizes(i) == blkRows && self.columnSizes(j) == blkCols) || ...
-                            (self.rowSizes(i) == blkRows && self.columnSizes(j) == 0) || ...
-                            (self.rowSizes(i) == 0 && self.columnSizes(j) == blkCols)
-                              self.data{i,j} = block;
-                         else
-                             error('addBlock:cat','Cannot add block of different size');
-                         end
-                     end
-                 end
+                if self.blockHasCompatibleRowDimensions(i, block) ...
+                        && self.blockHasCompatibleColumnDimensions(j, block)
+                    self.data{i,j} = block;
+                    self.rowSizes(i) = blkRows;
+                    self.columnSizes(j) = blkCols;
+                else
+                     error('addBlock:cat','Cannot add block of different size');
+                end
             end % else it needs to grow
-            
-            if i > self.rowBlocks 
-                self.rowBlocks = i;
-                if j > self.columnBlocks
-                    self.columnBlocks = j;     
-                end        
-            end           
+                
         end
 
         function blk = getBlock(self, i, j)
@@ -75,9 +56,24 @@ classdef BlockMatrix < handle
             blk = self.data{i,j};
         end
         
+        function s = size(self, varargin)
+            if isempty(varargin)
+                s = [length(self.rowSizes) length(self.columnSizes)];
+            else
+                switch varargin{1}
+                    case 1
+                        s = length(self.rowSizes);
+                    case 2
+                        s = length(self.columnSizes);
+                    otherwise
+                        error('BlockMatrix:size', 'Invalid index of dimension');
+                end
+            end
+        end
+
         function M = toMatrix(self)
-            for i = 1:self.rowBlocks
-                for j = 1:self.columnBlocks
+            for i = 1:length(self.rowSizes)
+                for j = 1:length(self.columnSizes)
                     if isempty(self.data{i,j})
                         self.data{i,j} = zeros(self.rowSizes(i), self.columnSizes(j));
                     end
@@ -88,7 +84,13 @@ classdef BlockMatrix < handle
     end
     
     methods (Access = private)
-        
+        function flag = blockHasCompatibleColumnDimensions(self, j, block)
+            flag = size(block, 2) == self.columnSizes(j) || self.columnSizes(j) == 0;
+        end
+
+        function flag = blockHasCompatibleRowDimensions(self, i, block)
+            flag = size(block, 1) == self.rowSizes(i) || self.rowSizes(i) == 0;
+        end
     end
         
 end
