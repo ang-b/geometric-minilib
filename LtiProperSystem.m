@@ -9,6 +9,7 @@ classdef LtiProperSystem < handle
         E
         n
         p
+        G
         algebraicProperties
     end
 
@@ -20,7 +21,6 @@ classdef LtiProperSystem < handle
         Gamma
         n1
         p1
-        G
         transformedSystem
     end
     
@@ -115,9 +115,16 @@ classdef LtiProperSystem < handle
             G = self.G;
         end
 
+        function setObserverFeedback(self, G)
+            self.G = G;
+        end
+
         function [A,B,C,E,n1,p1] = getUnobSubspaceDecomposition(self)
             if isempty(self.G)
                 error("Design a decopuling gain first");
+            end
+            if isempty(self.T)
+                self.getUnobSubspaceTransform();
             end
 
             AG = self.A + self.G * self.C;
