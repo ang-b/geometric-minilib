@@ -9,4 +9,4 @@ Originally intended to be a mixin for the Control System Toolbox, both for sake 
 
 ## Dependencies
 
-- Control Systems Toolbox for `designGainLQR`.
+- Control Systems Toolbox for ~~`designGainLQR`~~ (needs fix) `placePoles`. 

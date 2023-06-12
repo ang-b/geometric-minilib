@@ -132,6 +132,7 @@ classdef LtiProperSystem < handle
         
             L_XS = -place(A_XS', C_XS', usModXPoles)';
             G = L0 + P \ L_XS * H;
+            self.G = G;
         end
 
 %         function G = designGainLQR(self,Q,R)
