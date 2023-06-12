@@ -1,0 +1,3 @@
+[submodule "matlab-block-matrix"]
+	path = BlockMatrix
+	url = https://github.com/ang-b/matlab-block-matrix
